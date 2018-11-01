@@ -1,6 +1,6 @@
 module Main where
 
-import qualified Parser1
+import qualified Parsers
 
 main :: IO ()
-main = Parser1.run "resources/testFile.fs"
+main = putStrLn "Hello Parser"
