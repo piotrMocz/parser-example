@@ -23,6 +23,7 @@ resolver: lts-12.14
 ghc-options:
     parser-example: -Wall
 
+allow-newer: true
 # User packages to be built.
 # Various formats can be used as shown in the example below.
 #
