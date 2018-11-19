@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 530eb60983cf30d90f5a74f9ecc9d6a32b27eecf5b4f3ceafcbcaaf678163999
+-- hash: d675aae03dd5f169450ca00ca31b22664cd04a705576949ffdc39ad9e11861ac
 
 name:           parser-example
 version:        0.1.0.0
@@ -31,7 +31,9 @@ library
   hs-source-dirs:
       src
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
+    , hspec
     , megaparsec ==7.0.1
     , text
   default-language: Haskell2010
@@ -44,7 +46,9 @@ executable parser-example-exe
       app
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      QuickCheck
+    , base >=4.7 && <5
+    , hspec
     , megaparsec ==7.0.1
     , parser-example
     , text

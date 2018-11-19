@@ -13,6 +13,8 @@ dependencies:
 - base >= 4.7 && < 5
 - text
 - megaparsec == 7.0.1
+- hspec
+- QuickCheck
 
 library:
   source-dirs: src
@@ -38,5 +40,3 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - parser-example
-    - hspec
-    - QuickCheck

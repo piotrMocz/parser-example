@@ -201,3 +201,30 @@ Dopisz jeszcze po jednym przykładzie testowym na poprawne i niepoprawne parsowa
 Czyżbyśmy robili przysłowiową "robotę głupiego"? Wydaje się, że przykłady testowe, które piszemy dla różnych wejść, są wszystkie strasznie podobne. Czy nie ma jakiejś biblioteki, która zrobiłaby to za nas? Poszukała wielu przypadków (w tym brzegowych) tak, żeby zweryfikować nie tyle konkretne przypadki, co pewne właściwości?
 
 Tak! Istnieje, i nazywa się QuickCheck!
+
+Dodamy do naszego `package.yaml` dodamy zależność `quickcheck` (najlepiej w sekcji `test` -- tak, aby wszystkie frameworki do testów nie musiały się dołączać do "produkcyjnego" kodu, zwiększając czas budowania) i do pliku `Spec.hs` linijkę:
+```haskell
+import Test.QuickCheck
+```
+
+Choć QuickCheck w żaden sposób nie zależy od HSpeca, dobrze się z nim integruje, dostarczając ładnej składni, którą już znamy. Spróbujmy uogólnić testy, które pisaliśmy poprzednio. Chcielibyśmy sprawdzić, czy "parser `openingParen` zwraca `Right '('` dla każdego napisu zaczynającego się od otwierającego nawiasu. Popatrzmy:
+```haskell
+openingParenPropSpec :: Spec
+openingParenPropSpec = describe "A single character parser" $ do
+    it "should accept this character" $ property $
+        \s -> parse openingParen ('(':s) `shouldBe` Right '('
+```
+
+Wciąż wygląda to prawie jak język angielski. Różnica jest taka, że teraz, zamiast podawać konkretny przypadek, który musi być prawdziwy, podajemy pewną właściwość. Za pomocą funkcji `property` mówimy: "dla dowolnego (napisu) `s` musi zachodzić [...]". QuickCheck automagicznie potrafi sprawdzić wiele różnych wartości `s`, dobrze sobie radząc z szukaniem przypadków brzegowych.
+
+### Ćwiczenie 1.5
+
+Dopisz do `openingParenPropSpec` test na napisy, które powodują, że parser zwraca `Left`. Jak upewnić się, że napis będzie dowolny, **ale** nie będzie się zaczynał od `(`?
+
+### Ćwiczenie 1.6
+
+Napisz test, który zachodzi dla **prawie** wszystkich przypadków i sprawdź, czy QuickCheck go znajdzie.
+
+### Pytanie
+
+Jak to się dzieje, że możemy dodać `property` i lambdę zamiast po prostu `x shouldBe y`? Sprawdź typy funkcji `it` i `property`. Pomocne mogą się okazać, w GHCi, komendy `:t` i `:i`.
