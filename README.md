@@ -7,7 +7,7 @@ Niniejsze repozytorium ma na celu przedstawienie paru rzeczy:
 
 Warto zaznaczyć, że choć materiały w dużej części omawiają tworzenie parsera przy użyciu biblioteki [`megaparsec`](http://hackage.haskell.org/package/megaparsec), to jest on raczej pretekstem do przekazania powyższych informacji, niż celem samym w sobie (choć jest to bardzo dobra i nowoczesna biblioteka do pisania parserów).
 
-## 1. Parsery
+## Parsery
 
 Czym jest parser? Czymś, co przekształca tekst (w Haskellu może być to np. `String` albo `Text`) na jakiś ustrukturyzowany język formalny (najczęściej abstrakcyjne drzewo syntaktyczne jakiegoś języka). Przykładowo, możemy chcieć sparsować napis `"2 + 2 * 2"` do następującego obiektu: `Add (Lit 2) (Mul (Lit 2) (Lit 2))`. Dalej łatwo moglibyśmy napisać program, który wyliczy wartość takiego wyrażenia arytmetycznego.
 
@@ -38,7 +38,7 @@ Oczywiście, parserów możemy używać do dużo bardziej skomplikowanych zadań
 Pisanie parserów od zera jest wykonalne, ale zbędne: istnieją do tego wspaniałe narzędzia. My wybierzemy [`megaparsec`](http://hackage.haskell.org/package/megaparsec), gdyż wydaje się obecnie być "state of the art" bibliotek do tworzenia parserów. Cały pomysł opiera się na pisaniu prostych parserów, "rozumiejących" najprostsze konstrukcje (pojedyncze znaki czy słowa) i składaniu ich w bardziej zaawansowane parsery.
 
 
-### Projekt w Haskellu
+## Projekt w Haskellu
 
 Na dobry początek zaczniemy tworzyć nasz projekt.
 
@@ -228,3 +228,82 @@ Napisz test, który zachodzi dla **prawie** wszystkich przypadków i sprawdź, c
 ### Pytanie
 
 Jak to się dzieje, że możemy dodać `property` i lambdę zamiast po prostu `x shouldBe y`? Sprawdź typy funkcji `it` i `property`. Pomocne mogą się okazać, w GHCi, komendy `:t` i `:i`.
+
+## Rozwijanie parsera
+
+Potrafimy parsować jeden znak -- przydałoby się jednak umieć coś więcej. Parsery możemy składać, tak, by z prostszych kawałków złożyć coś, co potrafi parsować bardziej skomplikowane rzeczy. Zacznijmy dość prosto: parser, który akceptuje nawias otwierający **lub** zamykający:
+```haskell
+paren :: Parser Char
+paren = openingParen <|> closingParen
+
+-- dodaliśmy oczywiście jeszcze tą funkcję:
+closingParen :: Paren Char
+closingParen = P.char ')'
+```
+
+Możemy przetestować, czy wszystko działa:
+```haskell
+> parse paren "(hello)"
+Right '('
+> parse paren ")hello"
+Right ')'
+> parse paren "hello"
+Left <okropny błąd>
+```
+Wydaje się działać. Oczywiście, nie poprzestaniemy na wydawaniu się: dopiszemy testy.
+
+### Ćwiczenie 2.1
+
+Napisz w pliku `test/Spec.hs` dopisz:
+1. Testy jednostkowe, sprawdzające, czy parser `paren` działa dla otwierających i zamykających nawiasów.
+2. Testy jednostkowe, sprawdzające, czy parser `paren` poprawnie zwraca rezultat `Left <...>` dla niepoprawnych napisów.
+3. Testy QuickChecka, sprawdzające, czy dowolny napis zaczynający się od `(` lub `)` jest akceptowany przez parser.
+
+### Prawdziwe oblicze alternatywy
+
+Zastanówmy się przez chwilę, czym jest magiczne `<|>`, którego używamy? Czy to jakaś magiczny operator Megaparseca? Nie do końca:
+```haskell
+> :t (<|>)
+(<|>) :: GHC.Base.Alternative f => f a -> f a -> f a
+```
+
+`Alternative` to typeklasa, która jest abstrakcją stworzoną do właśnie takich celów.
+```haskell
+class Applicative f => Alternative f where
+  empty :: f a
+  (<|>) :: f a -> f a -> f a
+```
+Zobaczmy, jak działa to dla `Maybe`:
+```haskell
+> Nothing | Nothing
+Nothing
+> Just 42 | Nothing
+Just 42
+> Nothing | Just 42
+Just 42
+> Just 42 | Just 43
+Just 42
+```
+Widać zachowanie bardzo podobne, jak w przypadku naszych parserów. Swoją drogą, dla list `<|>` to po prostu konkatenacja.
+
+## Rozwijanie, ciąg dalszy
+
+Na razie jesteśmy w stanie parsować pojedyncze znaki, co jest imponujące, ale nie jesteśmy w stanie wiele zrobić. Jak zatem połączyć parsery w dłuższe sekwencje?
+
+Spróbujmy na początek trywialnego przykładu: sparsujemy otwierający nawias, a następnie nawias zamykający. Nie jest to samo w sobie zbyt użyteczne, ale nauczymy się przydatnych rzeczy. Przede wszystkim: Megaparsec modeluje rzeczy następujące po sobie w sekwencji tak, jak większość Haskellowego światka: za pomocą monad. Instancje dla parserów napisane są tak, by po kolei parsowały i "zjadały" kawałki wejściowego strumienia. Jeśli któryś z parserów nie zaakceptuje wejścia, cała sekwencja zwróci błąd.
+
+Najpierw przyglądniemy się, jak to działa w praktyce, a dopiero później zaglądniemy "pod maskę", by poznać nieco lepiej ideę działania parserów i ich składania.
+```haskell
+emptyParens :: Parser Char
+emptyParens = openingParen >> closingParen
+```
+Możemy sprawdzić w GHCi, czy działa tak, jakbyśmy się tego spodziewali:
+```haskell
+> parse emptyParens "()"
+Right ')'
+```
+Zwróćmy uwagę, że każdy nasz parser ma typ `Parser Char`, więc zawsze będzie zwracał tylko jeden znak. Docelowo chcemy, żeby parser zwrócił coś bardziej ustrukturyzowanego (AST) -- zajmiemy się tym w dalszych odcinkach.
+
+### Ćwiczenie 2.2
+
+Napisz testy (HSpec + QuickCheck) testujące parser `emptyParens`.

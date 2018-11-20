@@ -1,6 +1,6 @@
 module Parsers where
 
-import           Text.Megaparsec      (Parsec, )
+import           Text.Megaparsec      (Parsec, (<|>))
 import qualified Text.Megaparsec      as P
 import qualified Text.Megaparsec.Char as P
 
@@ -14,3 +14,11 @@ parse parser input = P.parse parser "" input
 openingParen :: Parser Char
 openingParen = P.char '('
 
+closingParen :: Parser Char
+closingParen = P.char ')'
+
+paren :: Parser Char
+paren = openingParen <|> closingParen
+
+emptyParens :: Parser Char
+emptyParens = openingParen >> closingParen
