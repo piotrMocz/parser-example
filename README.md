@@ -307,3 +307,146 @@ Zwróćmy uwagę, że każdy nasz parser ma typ `Parser Char`, więc zawsze będ
 ### Ćwiczenie 2.2
 
 Napisz testy (HSpec + QuickCheck) testujące parser `emptyParens`.
+
+### Parser pod maską
+
+Powiedzieliśmy, że przyglądniemy się, jak parser działa "pod maską". Zamiast oglądać implementację Megaparseca (która jest mocno zoptymalizowana -- w większości języków obniża to czytelność kodu, a co dopiero w Haskellu), spróbujmy napisać własny, prosty parser. (Pożyczymy implementację z [tej odpowiedzi na Stack Overflow](https://stackoverflow.com/questions/20660782/writing-a-parser-from-scratch-in-haskell), ale nasz parser będzie miał jeszcze instancję monady).
+
+Zacznijmy od definicji typu `Parser`:
+```
+type Error = String
+newtype Parser a = P { unP :: String -> (String, Either Error a) }
+```
+
+Parser to po prostu `newtype` nad funkcją, która przyjmuje napis wejściowy i zwraca parę: pierwszy element to pozostały fragment napisu wejściowego. Drugi to rezultat parsowania, który może być albo `Right <to, co zwraca parser>`, albo `Left <błąd parsowania>`. Łatwo zauważyć, że taka definicja sama w sobie nie pozwoli nam na zbyt wielką swobodę składania parserów (w końcu: moglibyśmy napisać parser jako jedną funkcję z wielką plątaniną `if`-ów, ale po to programujemy funkcyjnie, żeby rzeczy dobrze się "komponowały"). Powyżej widzieliśmy, że instancje `Alternative` i `Monad` dają naszym parserom duże możliwości -- napiszmy je więc. (W dzisiejszych czasach każda monada musi być również aplikatywem, więc musimy napisać instancje: `Functor`, `Applicative` i `Monad`).
+
+Najpierw instancja `Functor`:
+```haskell
+instance Functor Parser where
+  fmap f (P st) = P $ \stream -> case st stream of
+    (rest, Left err) -> (rest, Left err)
+    (rest, Right a ) -> (rest, Right (f a))
+```
+Dość proste: bierzemy nasz stary parser, wyciągamy z niego funkcję parsującą, a następnie tworzymy nową funkcję: taką, która zaaplikuje starą funkcję na swoim parametrze. Jeśli rezultat to `Right`, to zaaplikujemy `f` w środku. Jeśli rezultatem był błąd `Left`, zostawimy go jak jest. Warto zwrócić uwagę, że `st stream` nie wykona się od razu -- dopiero, jak ktoś "odpakuje" obiekt typu `Parser`. To jeden z uroków leniwej ewaluacji: w większości przypadków kopie nas w kostkę i spowalnia programy, ale czasami pozwala na eleganckie abstrakcje.
+
+Następnie instancja `Applicative`:
+```haskell
+instance Applicative Parser where
+  pure a = P (\stream -> (stream, Right a))
+  P f1 <*> P xx = P $ \stream0 -> case f1 stream0 of
+    (stream1, Left err) -> (stream1, Left err)
+    (stream1, Right f ) -> case xx stream1 of
+      (stream2, Left err) -> (stream2, Left err)
+      (stream2, Right x ) -> (stream2, Right (f x))
+```
+Funkcja `pure` jest prosta: zwraca swój argument "opakowany" w całą maszynerię parsera. Funkcja `<*>` (na którą ponoć mówi się "ap") robi podobną rzecz, którą robiło `fmap`, tylko dwa razy. 
+
+### Ćwiczenie 2.3
+
+Mając instancję `Applicative`, nie jest tak trudno wymyślić instancję monady (swoją drogą -- istnieją też parsery aplikatywne, ale my chcemy naśladować Megaparseca). Napisz instancję `Monad` dla naszego parsera (tak naprawdę wystarczy napisać metodę `>>=`).
+
+#### Wskazówka
+
+Sygnatury są następujące:
+```haskell
+instance Monad Parser where
+    return :: a -> Parser a
+    return = pure
+
+    (>>=) :: Parser a -> (a -> Parser b) -> Parser b
+    p >>= f = ???
+```
+
+### Parsowanie pojedynczych znaków
+
+Mamy monady, więc moglibyśmy już parsować sekwencje znaków. Ale nie umiemy parsować pojedynczych znaków! Faktycznie -- nieco się zapędziliśmy. Nasz parser wymaga jeszcze nieco "pracy u podstaw". Zdefiniujmy sobie funkcję, która pozwoli podglądnąć znak i zaakceptować go, jeśli spełnia podany w argumencie predykat. Oto ona:
+```haskell
+satisfy :: (Char -> Bool) -> Parser Char
+satisfy f = P $ \stream -> case stream of
+    []                 -> ([], Left "end of stream")
+    (c:cs) | f c       -> (cs, Right c)
+           | otherwise -> (cs, Left "did not satisfy")
+```
+
+### Ćwiczenie 2.4
+
+Używając funkcji `satisfy`, napisz funkcję `char`, parsującą konkretny znak. Jej sygnatura to: `char :: Char -> Parser Char`.
+
+### Alternatywy (4?)
+
+Megaparsec potrafił parsować `to` **lub** `tamto`. Wypada nam dopisać to do naszego zabawkowego parsera, żeby zrozumieć, jak to może działać. Interesuje nas funkcja, która dostanie dwa parsery i wykona następujące kroki:
+1. Uruchomi pierwszy parser na danym wejściu. Jeśli je zaakceptował, powinna zwrócić dobry rezultat.
+2. Jeśli pierwszy parser odrzucił wejście, zignoruje jego rezultat i uruchomi drugi parser. Wtedy już nie ma wyboru: musi po prostu zwrócić jego rezultat.
+Oczywiście funkcja nie tyle te kroki wykona, co zwróci funkcję, która je wykona, gdy zostanie uruchomiona. A to wszystko jeszcze opakowane w parserowy newtype!
+
+Kod może wyglądać tak:
+```haskell
+orElse :: Parser a -> Parser a -> Parser a
+orElse (P f1) (P f2) = P $ \stream0 -> case f1 stream0 of
+    (stream1, Left _)  -> f2 stream1
+    (stream1, Right a) -> (stream1, Right a)
+```
+
+To mały krok dla ludzkości, ale wielki dla naszego małego parsera: teraz możemy zdefiniować dla niego instancję `Alternative`. No więc proszę:
+```haskell
+instance Alternative Parser where
+    empty = P $ \stream -> (stream, Left "empty")
+    (<|>) = orElse
+```
+
+Nasza biblioteka robi się już całkiem użyteczna. Gdybyśmy jednak nie czuli potrzeby nieustannego doskonalenia naszego kodu, zapewne pisalibyśmy w języku innym, niż Haskell. Warto zatem nadmienić, że klasa `Alternative` ma jeszcze metody `some` oraz `many`. Mają defaultowe implementacje, ale możemy je przesłonić wydajniejszymi (podobnie jest na przykład z klasą `Monad`, która ma defaultową implementację `>>`, ale można napisać własną, jeśli z jakichś powodów mamy na nią dobry pomysł). Zróbmy to jako ćwiczenie:
+
+### Ćwiczenie 2.5
+
+Napisz metody:
+```haskell
+many :: Parser a -> Parser [a]
+some :: Parser a -> Parser [a]
+```
+które dostaną parser jako argument i będą akceptować odpowiednio: 0 lub więcej oraz 1 i więcej powtórzeń wejścia, które akceptuje ich parser argument. Przykładowo: `some $ char 'a'` zaakceptuje napisy `"ab"` i `"aaaabb"`, a odrzuci `"bb"`. `many $ char 'a'` zaakceptuje wszystkie z nich.
+
+### Jazda próbna parsera
+
+Do pełni szczęścia brakuje nam tylko drobnej funkcji owijającej wywołania parsera (dla wygody):
+```haskell
+parse :: Parser a -> String -> Either Error a
+parse parser input = snd $ (unP parser) input
+```
+
+Teraz możemy uruchomić `stack ghci` i sprawdzić, czy wszystko parsuje się zgodnie z naszymi oczekiwaniami:
+```haskell
+> let emptyParens = char '(' >> char ')'
+> parse emptyParens "()"
+Right ')'
+> parse emptyParens ")"
+Left "did not satisfy"
+> parse emptyParens "("
+Left "end of stream"
+```
+Podobnie możemy sprawdzić metody `some`, `many` oraz `<|>`.
+
+### Ćwiczenie 2.6
+
+Dopisz w HSpecu i QuickChecku testy naszego zabawkowego parsera. Możemy go dla wygody umieścić w pliku `src/MockParser.hs`. Należy jednak pamiętać, by w testach importować go w sposób kwalifikowany (np. `import qualified MockParser as MP`) -- w przeciwnym razie nazwy funkcji będą konfliktowały z Megaparsekiem.
+
+### Uwagi końcowe i przemyślenia
+
+Rozumiemy już, jaki pomysł stoi za takim podejściem do parsowania i widzimy, jak sprytnie napisane instancje `Monad` oraz `Alternative` pozwalają nam na składanie prostych parserów w bardziej skomplikowane. Ale chwileczkę... Czy na pewno jest konieczne, żeby nasz parser był monadą? Czyżbyśmy wykonali pracę na darmo? Przecież istnieją aplikatywne parsery! W tym celu zróbmy dwie rzeczy: jedno ćwiczenie (ćwiczonko) i jedno przemyślenie.
+
+### Ćwiczenie 2.7
+
+Jedyną rzeczą z monady, z jakiej korzystaliśmy, jest operator `>>`. Pozwala nam na parsowanie jednej rzeczy po drugiej, w sekwencji. Da się ten sam efekt osiągnąć tylko przy pomocy instancji `Applicative` naszego parsera. Napisz funkcję `andThen :: Parser a -> Parser b -> Parser b`, która wykona dwa parsery w sekwencji tak, jak widzieliśmy powyżej.
+
+### Wskazówka
+
+Pomocna może się okazać funkcja `seq`, która skądinąd jest dość ciekawa.
+
+### Przemyślenie
+
+Co "potrafi" parser monadyczny, czego nie potrafiłby parser aplikatywny?
+
+### Wkazówka
+
+Patrząc na ćwiczenie powyżej: czym się różni (w kontekście naszego parsera) `>>` od `>>=`? Co ignoruje `>>`?
+
+Być może ciekawsza dyskusja to ewentualna przewaga parsera aplikatywnego nad monadycznym: wykracza to nieco poza zakres tego kursu, więc zainteresowanych pozostaje mi odesłać do internetu, który jest pełen opracowań na ten temat. Nam wystarczy wiedza, że Megaparsec jest parserem monadycznym, więc z takim będziemy mieć przez resztę kursu do czynienia -- dla naszych potrzeb będzie to na pewno dobra decyzja.
