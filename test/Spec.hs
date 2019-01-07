@@ -1,6 +1,9 @@
-import Test.Hspec
-import Test.QuickCheck
-import Parsers
+import           Test.Hspec
+import           Test.QuickCheck
+
+import           Lexer
+import           Parsers
+
 
 isLeft :: Either a b -> Bool
 isLeft (Left  _) = True
@@ -26,10 +29,11 @@ openingParenPropSpec = describe "A single character parser" $ do
         \s -> do
             let s' = case s of
                     ('(':rest) -> rest
-                    x -> x
+                    x          -> x
             isLeft (parse openingParen s') `shouldBe` True
 
 main :: IO ()
 main = hspec $ do
+    let x = Lexer.symbol "while"
     openingParenSpec
     openingParenPropSpec

@@ -1,6 +1,8 @@
 module Main where
 
+import qualified Ast
 import qualified Parsers
 
 main :: IO ()
-main = putStrLn "Hello Parser"
+main = do
+    putStrLn "Hello Parser"

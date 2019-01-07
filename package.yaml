@@ -14,7 +14,9 @@ dependencies:
 - text
 - megaparsec == 7.0.1
 - hspec
+- parser-combinators
 - QuickCheck
+- time
 
 library:
   source-dirs: src

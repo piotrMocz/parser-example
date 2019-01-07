@@ -1,10 +1,8 @@
-cabal-version: 1.12
-
--- This file has been generated from package.yaml by hpack version 0.31.0.
+-- This file has been generated from package.yaml by hpack version 0.28.2.
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: d675aae03dd5f169450ca00ca31b22664cd04a705576949ffdc39ad9e11861ac
+-- hash: 4dcd54b8143eba157e352a0c9600f741164d1654616d5e390ada5adae5a66f4b
 
 name:           parser-example
 version:        0.1.0.0
@@ -16,6 +14,7 @@ copyright:      2018 Piotr Moczurad
 license:        BSD3
 license-file:   LICENSE
 build-type:     Simple
+cabal-version:  >= 1.10
 extra-source-files:
     README.md
 
@@ -25,7 +24,12 @@ source-repository head
 
 library
   exposed-modules:
+      Ast
+      Lexer
+      MockParser
       Parsers
+      RealParser
+      TF
   other-modules:
       Paths_parser_example
   hs-source-dirs:
@@ -35,7 +39,9 @@ library
     , base >=4.7 && <5
     , hspec
     , megaparsec ==7.0.1
+    , parser-combinators
     , text
+    , time
   default-language: Haskell2010
 
 executable parser-example-exe
@@ -50,8 +56,10 @@ executable parser-example-exe
     , base >=4.7 && <5
     , hspec
     , megaparsec ==7.0.1
+    , parser-combinators
     , parser-example
     , text
+    , time
   default-language: Haskell2010
 
 test-suite parser-example-test
@@ -67,6 +75,8 @@ test-suite parser-example-test
     , base >=4.7 && <5
     , hspec
     , megaparsec ==7.0.1
+    , parser-combinators
     , parser-example
     , text
+    , time
   default-language: Haskell2010
